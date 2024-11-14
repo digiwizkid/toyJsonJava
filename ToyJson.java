@@ -3,14 +3,15 @@
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.lang.System.out;
+import static java.nio.file.Files.lines;
 
 public class ToyJson {
 
@@ -23,7 +24,12 @@ public class ToyJson {
         } else {
             if (helper.isValidJsonFile(args[0])) {
                 out.println("Json file");
-                helper.readTextFile(helper.prepareFile(args[0]));
+
+                try {
+                    helper.readTextFile(helper.prepareFile(args[0]));
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
             } else {
                 out.println("Not a JSON");
             }
@@ -61,26 +67,46 @@ public class ToyJson {
             return tempFile;
         }
 
-        private void readTextFile(File file) {
-            Map<String, String> objMap = new HashMap<>();
+        private void readTextFile(File file) throws IOException {
 
-            try (Stream<String> stream = Files.lines(Paths.get(file.getPath()))) {
-                objMap = stream.filter(line -> !line.trim().isEmpty()) // Filter out empty lines
-                        .filter(line -> line.length() > 2) // ignore { and }
-                        .map(line -> line.split(":")) // Split each pair by colon
-                        .collect(
-                                Collectors.toMap(
-                                        line -> line[0].trim(),
-                                        line -> line[1].substring(0, line[1].length() - 1).trim(),
-                                        (oldValue, newValue) -> oldValue // Merge function: keep the old value
-                                ));
+            // supplier to reuse stream
+            Supplier<Stream<String>> lineSupplier = () -> {
+                try {
+                    return lines(Paths.get(file.getPath()));
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            };
 
-                JObject jObject = new JObject((HashMap) objMap);
-                jObject.display();
+            // check for array or object
+            boolean isArray = lineSupplier.get().filter(line -> !line.trim().isEmpty())
+                    .findFirst().get().charAt(0) == '[';
 
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+            boolean isObj = lineSupplier.get().filter(line -> !line.trim().isEmpty())
+                    .findFirst().get().charAt(0) == '{';
+
+                /*if (isArray) {
+                    HashMap<String, String> parsedObjMap = (HashMap<String, String>) parseObject(lineSupplier);
+                    JObject jObject = new JObject(parsedObjMap);
+                    jObject.display();
+                } else {*/
+            HashMap<String, String> parsedObjMap = (HashMap<String, String>) parseObject(lineSupplier);
+            JObject jObject = new JObject(parsedObjMap);
+            jObject.display();
+//                }
+        }
+
+        private Map<String, String> parseObject(Supplier<Stream<String>> supplier) {
+            // single object : test.json
+            return supplier.get().filter(line -> !line.trim().isEmpty()) // Filter out empty lines
+                    .filter(line -> line.trim().length() > 2) // ignore { and }
+                    .map(line -> line.split(":")) // Split each pair by colon
+                    .collect(
+                            Collectors.toMap(
+                                    line -> line[0].trim(),
+                                    line -> line[1].substring(0, line[1].length() - 1).trim(),
+                                    (oldValue, newValue) -> oldValue // Merge function: keep the old value
+                            ));
         }
     }
 
