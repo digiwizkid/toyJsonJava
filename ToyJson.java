@@ -90,21 +90,23 @@ public class ToyJson {
                     JObject jObject = new JObject(parsedObjMap);
                     jObject.display();
                 } else {*/
-            HashMap<String, String> parsedObjMap = (HashMap<String, String>) parseObject(lineSupplier);
+            HashMap<String, Object> parsedObjMap = (HashMap<String, Object>) parseObject(lineSupplier);
             JObject jObject = new JObject(parsedObjMap);
             jObject.display();
 //                }
         }
 
-        private Map<String, String> parseObject(Supplier<Stream<String>> supplier) {
+        private Map<String, Object> parseObject(Supplier<Stream<String>> supplier) {
             // single object : test.json
             return supplier.get().filter(line -> !line.trim().isEmpty()) // Filter out empty lines
-                    .filter(line -> line.trim().length() > 2) // ignore { and }
-                    .map(line -> line.split(":")) // Split each pair by colon
+                    .filter(line -> !line.trim().equals("{")) // ignore {, }, [, ]
+                    .filter(line -> !line.trim().equals("}")) // ignore {, }, [, ]
+                    .map(line -> line.split(":", 2)) // Split each pair by colon
+                    .peek(line -> out.println(line.length + " - " + line[0] + " - " + line[1]))
                     .collect(
                             Collectors.toMap(
                                     line -> line[0].trim(),
-                                    line -> line[1].substring(0, line[1].length() - 1).trim(),
+                                    line -> line[1].trim(),
                                     (oldValue, newValue) -> oldValue // Merge function: keep the old value
                             ));
         }
