@@ -99,8 +99,10 @@ public class ToyJson {
         private Map<String, Object> parseObject(Supplier<Stream<String>> supplier) {
             // single object : test.json
             return supplier.get().filter(line -> !line.trim().isEmpty()) // Filter out empty lines
-                    .filter(line -> !line.trim().equals("{")) // ignore {, }, [, ]
-                    .filter(line -> !line.trim().equals("}")) // ignore {, }, [, ]
+                    .filter(line -> !line.trim().equals("{")) // ignore {
+                    .filter(line -> !line.trim().equals("}")) // ignore }
+                    .filter(line -> !line.trim().equals("[")) // ignore [
+                    .filter(line -> !line.trim().equals("]")) // ignore ]
                     .map(line -> line.split(":", 2)) // Split each pair by colon
                     .peek(line -> out.println(line.length + " - " + line[0] + " - " + line[1]))
                     .collect(
