@@ -1,9 +1,9 @@
 /// usr/bin/env jbang "$0" "$@" ; exit $?
 
-
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Supplier;
@@ -37,6 +37,7 @@ public class ToyJson {
     }
 
     static class ToyJsonHelper {
+
         // input file validation based on the file extension
         private boolean isValidJsonFile(String fileNameStr) {
             boolean result = false;
@@ -68,7 +69,6 @@ public class ToyJson {
         }
 
         private void readTextFile(File file) throws IOException {
-
             // supplier to reuse stream
             Supplier<Stream<String>> lineSupplier = () -> {
                 try {
@@ -79,42 +79,155 @@ public class ToyJson {
             };
 
             // check for array or object
-            boolean isArray = lineSupplier.get().filter(line -> !line.trim().isEmpty())
-                    .findFirst().get().charAt(0) == '[';
+            boolean isArray =
+                    lineSupplier
+                            .get()
+                            .filter(line -> !line.trim().isEmpty())
+                            .findFirst()
+                            .get()
+                            .charAt(0) ==
+                            '[';
 
-            boolean isObj = lineSupplier.get().filter(line -> !line.trim().isEmpty())
-                    .findFirst().get().charAt(0) == '{';
+            // parse nested obj
+            parseNestedObj(file);
 
-                /*if (isArray) {
-                    HashMap<String, String> parsedObjMap = (HashMap<String, String>) parseObject(lineSupplier);
-                    JObject jObject = new JObject(parsedObjMap);
-                    jObject.display();
-                } else {*/
-            HashMap<String, Object> parsedObjMap = (HashMap<String, Object>) parseObject(lineSupplier);
-            JObject jObject = new JObject(parsedObjMap);
-            jObject.display();
-//                }
+            if (isArray) {
+                HashMap<String, Object> parsedObjMap = (HashMap<
+                        String,
+                        Object
+                        >) parseArray(lineSupplier);
+                //                JObject jObject = new JObject(parsedObjMap);
+                //                jObject.display();
+                //
+                //                JArray jArray = new JArray();lineSupplier
+                //                jArray.addObj(jObject);
+                //                jArray.display();
+            } else {
+                //                HashMap<String, Object> parsedObjMap = (HashMap<String, Object>) parseObject(lineSupplier);
+                //                parseMapForObject(parsedObjMap);
+                //                JObject jObject = new JObject(parsedObjMap);
+                //                jObject.display();
+            }
         }
 
-        private Map<String, Object> parseObject(Supplier<Stream<String>> supplier) {
-            // single object : test.json
-            return supplier.get().filter(line -> !line.trim().isEmpty()) // Filter out empty lines
+        private void parseMapForObject(HashMap<String, Object> inputMap) {
+            out.println("map content\n");
+            inputMap.forEach((key, value) -> {
+                out.println(key + " : " + value);
+            });
+        }
+
+        private void parseNestedObj(File file) {
+            try {
+                BufferedReader br = new BufferedReader(new FileReader(file));
+                StringBuilder sb = new StringBuilder();
+                String nextLine;
+
+                while ((nextLine = br.readLine()) != null) {
+                    sb.append(nextLine);
+                }
+
+                br.close();
+                out.println("res:\n" + sb);
+
+                // {  "Image": {    "Width":  800,    "Height": 600,    "Title":  "View from 15th Floor",    "Thumbnail": {      "Url":    "http://www.example.com/image/481989943",      "Height": 125,      "Width":  100    },    "Animated" : false,    "IDs": [116, 943, 234, 38793]  }}
+
+                // beautify
+                String resultString;
+                resultString = Arrays.stream(sb
+                        .chars()
+                        .mapToObj(c -> {
+                            char character = (char) c;
+
+                            if (isOpeningPunctuation(character))
+                                return character + "\n";
+                            else if (isClosingPunctuation(character))
+                                return "\n" + character;
+                            else
+                                return character + "";
+
+                        })
+                        .map(str->str.split(":"))
+                        .toArray())
+                                .map(str->str.toString().trim())
+                        .collect(Collectors.joining());
+
+                out.println("res1:\n" + resultString);
+
+            } catch (FileNotFoundException e) {
+                throw new RuntimeException(e);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        // Helper method to check for punctuation
+        private boolean isOpeningPunctuation(char c) {
+            return c == '{' || c == ',' || c == '[';
+        }
+
+        private boolean isClosingPunctuation(char c) {
+            return c == '}' || c == ']';
+        }
+
+
+        private Map<String, Object> parseObject(
+                Supplier<Stream<String>> supplier
+        ) {
+            // single linear object : test.json
+            return supplier
+                    .get()
+                    .filter(line -> !line.trim().isEmpty()) // Filter out empty lines
                     .filter(line -> !line.trim().equals("{")) // ignore {
                     .filter(line -> !line.trim().equals("}")) // ignore }
                     .filter(line -> !line.trim().equals("[")) // ignore [
                     .filter(line -> !line.trim().equals("]")) // ignore ]
                     .map(line -> line.split(":", 2)) // Split each pair by colon
-                    .peek(line -> out.println(line.length + " - " + line[0] + " - " + line[1]))
                     .collect(
                             Collectors.toMap(
                                     line -> line[0].trim(),
                                     line -> line[1].trim(),
                                     (oldValue, newValue) -> oldValue // Merge function: keep the old value
-                            ));
+                            )
+                    );
+        }
+
+        private Map<String, Object> parseArray(
+                Supplier<Stream<String>> supplier
+        ) {
+            /*[
+                {
+                    "name": "test1"
+                },
+                {
+                    "name": "test2"
+                }
+            ]*/
+
+            Map<String, Object> result = supplier
+                    .get()
+                    .filter(line -> !line.trim().isEmpty()) // Filter out empty lines
+                    .filter(line -> !line.trim().equals("[")) // ignore [
+                    .filter(line -> !line.trim().equals("{")) // ignore [
+                    .filter(line -> !line.trim().equals("}")) // ignore [
+                    .filter(line -> !line.trim().equals("},")) // ignore [
+                    .filter(line -> !line.trim().equals("]")) // ignore ]
+                    .map(line -> line.split(":")) // Split each obj by ,
+                    .filter(line -> !line.equals(","))
+                    .collect(
+                            Collectors.toMap(
+                                    line -> line[0],
+                                    line -> line[1],
+                                    (oldValue, newValue) -> oldValue
+                            )
+                    );
+
+            return new HashMap<>();
         }
     }
 
     static class JObject<T> {
+
         HashMap<String, T> elementMap;
 
         public JObject(HashMap<String, T> elementMap) {
@@ -130,9 +243,34 @@ public class ToyJson {
         }
 
         public void display() {
+            out.println("Displaying object content: \n");
             elementMap.forEach((key, value) -> {
                 out.println(key + ": " + value);
             });
+        }
+    }
+
+    static class JArray {
+
+        ArrayList<JObject> objList;
+
+        public void addObj(JObject jObject) {
+            if (objList == null) {
+                objList = new ArrayList<>();
+            }
+            objList.add(jObject);
+        }
+
+        public ArrayList getObjList() {
+            return objList;
+        }
+
+        public void setObjList(ArrayList objList) {
+            this.objList = objList;
+        }
+
+        public void display() {
+            out.println("Displaying array content: \n");
         }
     }
 }

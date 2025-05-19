@@ -202,3 +202,11 @@ Here are three small JSON texts containing only values:
 42
 
 true
+
+=====================
+
+**Progress**
+
+- linear json object
+- linear json array
+- 
